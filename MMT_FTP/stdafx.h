@@ -32,5 +32,6 @@
 #include <sstream>
 #include <direct.h>
 #include <cctype>
+#include <fstream>
 
 // TODO: reference additional headers your program requires here

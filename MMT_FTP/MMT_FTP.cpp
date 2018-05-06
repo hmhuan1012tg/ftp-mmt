@@ -192,15 +192,39 @@ int main(int argc, char* argv[])
 								sock.Close();
 							}
 
+							if (firstToken == "get") {
+								CSocket connector, sock;
+								sock.Create();
+								sock.Listen();
+
+								CreateDataConnection(client, GetHostNumber(client), GetPortNumber(sock));
+								line.replace(line.begin(), line.begin() + 3, "retr");
+
+								client.Send(line.c_str(), line.length());
+								string responseCode = PrintResponse(client);
+								if (responseCode[0] == '1' && sock.Accept(connector)) {
+									string filename;
+									ss >> filename;
+									ofstream os(filename.c_str());
+
+									char buffer[MAX_BUF_LEN] = { 0 };
+									int len = 0;
+									do {
+										len = connector.Receive(buffer, MAX_BUF_LEN);
+										os.write(buffer, len);
+									} while (len == MAX_BUF_LEN);
+
+									PrintResponse(client);
+								}
+								sock.Close();
+							}
+
 						} while (firstToken != "exit" && firstToken != "quit");
 					}
 					else {
 						cout << "Problem connecting to Server ID: " << argv[1] << " at Port number: " << argv[2] << endl;
 					}
-					/*CString s;
-					UINT l;
-					client.GetSockName(s, l);
-					cout << string(CW2A(s).m_psz) << endl << l << endl;*/
+				
 					client.Close();
 				}
 				else {
