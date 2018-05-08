@@ -17,11 +17,11 @@ CWinApp theApp;
 using namespace std;
 
 struct HostNumber {
-	unsigned int h1, h2, h3, h4;
+	unsigned int h[4];
 };
 
 struct PortNumber {
-	unsigned int p1, p2;
+	unsigned int p[2];
 };
 
 string PrintResponse(CSocket& receiver) {
@@ -106,13 +106,47 @@ PortNumber GetPortNumber(CSocket& socket) {
 }
 
 void CreateDataConnection(CSocket& socket, HostNumber hn, PortNumber pn) {
-	string msg = "port " + to_string(hn.h1) + "," + to_string(hn.h2) + "," 
-						 + to_string(hn.h3) + "," + to_string(hn.h4) + ","
-						 + to_string(pn.p1) + "," + to_string(pn.p2) + "\r\n";
+	string msg = "port " + to_string(hn.h[0]) + "," + to_string(hn.h[1]) + "," 
+						 + to_string(hn.h[2]) + "," + to_string(hn.h[3]) + ","
+						 + to_string(pn.p[0]) + "," + to_string(pn.p[1]) + "\r\n";
 
 	socket.Send(msg.c_str(), msg.length());
 
 	string responseCode = PrintResponse(socket);
+}
+
+void CreatePassiveConnection(CSocket& client, CSocket& socket) {
+	string msg = "pasv\r\n";
+	client.Send(msg.c_str(), msg.length());
+
+	char buffer[MAX_BUF_LEN] = { 0 };
+	int byte = client.Receive(buffer, MAX_BUF_LEN);
+	buffer[byte] = '\0';
+
+	string recvStr(buffer);
+	recvStr = recvStr.substr(recvStr.find('(') + 1, recvStr.find(')') - recvStr.find('(') - 1);
+	cout << recvStr << endl;
+
+	HostNumber hn;
+	PortNumber pn;
+	stringstream ss(recvStr);
+
+	for (int i = 0; i < 4; i++) {
+		string number;
+		getline(ss, number, ',');
+		hn.h[i] = atoi(number.c_str());
+	}
+	
+	for (int i = 0; i < 2; i++) {
+		string number;
+		getline(ss, number, ',');
+		pn.p[i] = atoi(number.c_str());
+	}
+
+	string host = to_string(hn.h[0]) + "." + to_string(hn.h[1]) + "." + to_string(hn.h[2]) + "." + to_string(hn.h[3]);
+	unsigned int port = pn.p[0] * 16 * 16 + pn.p[1];
+
+	socket.Connect(CStringW(host.c_str()), port);
 }
 
 int main(int argc, char* argv[])
@@ -217,6 +251,40 @@ int main(int argc, char* argv[])
 									PrintResponse(client);
 								}
 								sock.Close();
+							}
+
+							if (firstToken == "pasv") {
+								CSocket socket;
+								PortNumber pn = GetPortNumber(client);
+								if (socket.Create(pn.p[0] * 16 * 16 + pn.p[1] + 1)) {
+									CreatePassiveConnection(client, socket);
+
+									ss >> token;
+									if (token == "get") {
+										line.replace(line.begin(), line.begin() + 8, "retr");
+									}
+
+									client.Send(line.c_str(), line.length());
+									string responseCode = PrintResponse(client);
+									if (responseCode[0] == '1') {
+										string filename;
+										ss >> filename;
+										ofstream os(filename.c_str());
+
+										char buffer[MAX_BUF_LEN] = { 0 };
+										int len = 0;
+										do {
+											len = socket.Receive(buffer, MAX_BUF_LEN);
+											os.write(buffer, len);
+										} while (len == MAX_BUF_LEN);
+
+										PrintResponse(client);
+									}
+									socket.Close();
+								}
+								else {
+									cout << "Cannot create port " << pn.p[0] * 16 * 16 + pn.p[1] + 1 << endl;
+								}
 							}
 
 						} while (firstToken != "exit" && firstToken != "quit");

@@ -33,5 +33,6 @@
 #include <direct.h>
 #include <cctype>
 #include <fstream>
+#include <iterator>
 
 // TODO: reference additional headers your program requires here
